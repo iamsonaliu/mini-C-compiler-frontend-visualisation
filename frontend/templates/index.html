@@ -778,19 +778,32 @@ function renderSymbols(symbols) {
     return;
   }
 
-  const rows = symbols.map(s => `
-    <tr>
-      <td>${escapeHtml(s.name)}</td>
+  const rows = symbols.map(s => {
+    // Style adjustments for unused variables
+    const rowStyle = s.used ? '' : 'opacity: 0.6;';
+    const usageBadge = s.used 
+      ? '<span class="token-type tt-literal" style="font-size:9px; margin-left:8px;">USED</span>' 
+      : '<span class="token-type tt-error" style="font-size:9px; margin-left:8px; opacity:0.8;">UNUSED</span>';
+
+    return `
+    <tr style="${rowStyle}">
+      <td>
+        <div style="display:flex; align-items:center;">
+          ${escapeHtml(s.name)} 
+          ${usageBadge}
+        </div>
+      </td>
       <td><span class="token-type tt-keyword">${s.type}</span></td>
       <td><span style="color:var(--muted);font-size:11px">${s.scope}</span></td>
       <td>${s.line}</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 
   el.innerHTML = `
     <div class="phase-label">Phase 3 — Symbol Table · ${symbols.length} symbol(s)</div>
     <table class="token-table">
       <thead>
-        <tr><th>Name</th><th>Type</th><th>Scope</th><th>Line</th></tr>
+        <tr><th>Name & Status</th><th>Type</th><th>Scope</th><th>Line</th></tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>`;
