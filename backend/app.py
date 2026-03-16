@@ -8,8 +8,8 @@ from semantic import SemanticAnalyzer
 
 app = Flask(
     __name__,
-    template_folder=os.path.join(os.path.dirname(__file__), '..', 'frontend', 'templates'),
-    static_folder=os.path.join(os.path.dirname(__file__), '..', 'frontend', 'static')
+    static_folder=os.path.join(os.path.dirname(__file__), '..', 'react-frontend', 'dist'),
+    static_url_path='/'
 )
 
 @app.after_request
@@ -21,7 +21,7 @@ def add_cors(response):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return app.send_static_file('index.html')
 
 @app.route('/api/compile', methods=['POST', 'OPTIONS'])
 def compile_code():
