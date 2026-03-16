@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mini-C Compiler · Front-End Visualizer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="app">
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">C</div>
+      <div class="logo-text">Mini-<span>C</span> Compiler</div>
+    </div>
+    <div class="badge">FRONT-END VISUALIZER</div>
+    <div class="header-sep"></div>
+    <div class="badge">v1.0</div>
+  </header>
+
+  <!-- Main -->
+  <div class="main">
+    <!-- Left: Editor -->
+    <div class="left-panel">
+      <div class="panel-header">
+        <span>Source Editor</span>
+        <div class="dot-row">
+          <div class="dot dot-red"></div>
+          <div class="dot dot-yellow"></div>
+          <div class="dot dot-green"></div>
+        </div>
+      </div>
+
+      <div id="editor-container">
+        <textarea id="code-input" spellcheck="false" placeholder="// Enter Mini-C code here...
+int main() {
+    int x = 10;
+    return 0;
+}"></textarea>
+      </div>
+
+      <div class="editor-footer">
+        <select class="example-select" id="example-select" title="Load example">
+          <option value="">Load example…</option>
+          <option value="hello">Hello World</option>
+          <option value="arithmetic">Arithmetic</option>
+          <option value="if_else">If / Else</option>
+          <option value="while_loop">While Loop</option>
+          <option value="undeclared">⚠ Undeclared Var</option>
+          <option value="duplicate">⚠ Duplicate Decl</option>
+          <option value="syntax_err">⚠ Syntax Error</option>
+        </select>
+        <button id="validate-btn">
+          <span class="btn-icon">▶</span>
+          Validate
+        </button>
+      </div>
+    </div>
+
+    <!-- Right: Results -->
+    <div class="right-panel">
+      <div id="status-banner">
+        <span class="status-icon" id="status-icon"></span>
+        <span id="status-text"></span>
+      </div>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="tokens">Tokens <span class="tab-badge" id="tb-tokens">—</span></button>
+        <button class="tab" data-tab="errors">Errors <span class="tab-badge" id="tb-errors">—</span></button>
+        <button class="tab" data-tab="tree">Parse Tree</button>
+        <button class="tab" data-tab="symbols">Symbols <span class="tab-badge" id="tb-symbols">—</span></button>
+      </div>
+
+      <!-- Tokens Tab -->
+      <div class="tab-content active" id="tab-tokens">
+        <div class="tokens-container" id="tokens-content">
+          <div class="placeholder">
+            <div class="placeholder-icon">⬡</div>
+            <p>Token stream will appear here after validation.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Errors Tab -->
+      <div class="tab-content" id="tab-errors">
+        <div class="errors-container" id="errors-content">
+          <div class="placeholder">
+            <div class="placeholder-icon">⬡</div>
+            <p>Lexical, syntax, and semantic errors will appear here.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Parse Tree Tab -->
+      <div class="tab-content" id="tab-tree" id="tree-tab">
+        <div id="tree-container">
+          <div class="tree-empty" id="tree-empty">
+            <div class="tree-empty-icon">🌲</div>
+            <p>Parse tree will render here after validation.</p>
+          </div>
+          <svg id="tree-svg"></svg>
+          <div class="tree-controls">
+            <button class="tree-btn" id="tree-zoom-in"  title="Zoom in">+</button>
+            <button class="tree-btn" id="tree-zoom-out" title="Zoom out">−</button>
+            <button class="tree-btn" id="tree-reset"    title="Reset view">⌖</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Symbols Tab -->
+      <div class="tab-content" id="tab-symbols">
+        <div class="symbols-container" id="symbols-content">
+          <div class="placeholder">
+            <div class="placeholder-icon">⬡</div>
+            <p>Symbol table will appear here after validation.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
