@@ -47,7 +47,7 @@ def compile_code():
     status = 'success' if not all_errors else 'error'
 
     if not all_errors:
-        msg = '✓ Code is syntactically and semantically correct!'
+        msg = ' Code is syntactically and semantically correct!'
         if sem_warnings:
             msg += f' ({len(sem_warnings)} warning(s))'
     else:
@@ -55,7 +55,7 @@ def compile_code():
         if lex_errors: parts.append(f"{len(lex_errors)} lexical error(s)")
         if syn_errors: parts.append(f"{len(syn_errors)} syntax error(s)")
         if sem_errors: parts.append(f"{len(sem_errors)} semantic error(s)")
-        msg = '✗ Compilation failed: ' + ', '.join(parts)
+        msg = 'Compilation failed: ' + ', '.join(parts)
 
     return jsonify({
         'tokens':            tokens_list,
