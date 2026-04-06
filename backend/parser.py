@@ -1,6 +1,7 @@
 """
 Pure-Python recursive-descent parser for Mini-C.
 Builds a ParseTreeNode tree and collects syntax errors.
+
 """
 
 from parse_tree import ParseTreeNode
