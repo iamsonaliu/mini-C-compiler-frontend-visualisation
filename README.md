@@ -39,7 +39,7 @@ Featuring a futuristic dark-theme interface with an adjustable/resizable split-p
 │                                                                        │
 │  ┌───────────────────────┐    ┌───────────────────────┐                │
 │  │   Adjustable Editor   │    │   Results Console     │                │
-│  │   • Split resizing    │    │   • Zoomable Parse Tree│                │
+│  │   • Split resizing    │    │   • Zoomable Parse Tree│               │
 │  │   • Real-time compile │    │   • Interactive Tabs  │                │
 │  └───────────────────────┘    └───────────────────────┘                │
 └────────────────────────────────────────────────────────────────────────┘
