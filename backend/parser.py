@@ -2,10 +2,24 @@
 Pure-Python recursive-descent parser for Mini-C.
 Builds a ParseTreeNode tree and collects syntax errors.
 
+Supported constructs:
+  - Variable declarations & assignments (including compound: +=, -=, *=, /=)
+  - if / else
+  - while, for, do-while loops
+  - break, continue
+  - switch / case / default
+  - return, printf, scanf
+  - Function definitions & function calls
+  - Increment / decrement (prefix & postfix)
+  - Full expression parsing with precedence climbing
 """
 
 from parse_tree import ParseTreeNode
 from lexer import tokenize
+
+# ── Compound-assignment token set ────────────────────────────────────────────
+COMPOUND_ASSIGN_OPS = {'PLUS_ASSIGN', 'MINUS_ASSIGN', 'TIMES_ASSIGN', 'DIVIDE_ASSIGN', 'MODULO_ASSIGN'}
+
 
 class Parser:
     def __init__(self, tokens):
@@ -49,11 +63,18 @@ class Parser:
         return t
 
     def sync(self):
-        """Error recovery: skip to next semicolon or closing brace."""
-        while self.peek() and self.peek_type() not in ('SEMI', 'RBRACE'):
+        """Error recovery: skip to next semicolon, closing brace, case, or default."""
+        while self.peek() and self.peek_type() not in ('SEMI', 'RBRACE', 'CASE', 'DEFAULT'):
             self.pos += 1
         if self.peek_type() == 'SEMI':
             self.pos += 1
+
+    def lookahead(self, offset=1):
+        """Return the token at pos+offset (or None)."""
+        idx = self.pos + offset
+        if idx < len(self.tokens):
+            return self.tokens[idx]
+        return None
 
     # ── Grammar ───────────────────────────────────────────────────────────────
     TYPE_TOKENS = ('INT', 'FLOAT', 'CHAR', 'VOID')
@@ -79,32 +100,58 @@ class Parser:
         kind = t['type']
 
         if kind in self.TYPE_TOKENS:
+            # Could be a function definition:  type ID (
+            la1 = self.lookahead(1)
+            la2 = self.lookahead(2)
+            if (la1 and la1['type'] == 'ID' and
+                    la2 and la2['type'] == 'LPAREN'):
+                return self.parse_function_def()
             return self.parse_declaration()
         elif kind == 'IF':
             return self.parse_if()
         elif kind == 'WHILE':
             return self.parse_while()
+        elif kind == 'FOR':
+            return self.parse_for()
+        elif kind == 'DO':
+            return self.parse_do_while()
+        elif kind == 'SWITCH':
+            return self.parse_switch()
+        elif kind == 'BREAK':
+            return self.parse_break()
+        elif kind == 'CONTINUE':
+            return self.parse_continue()
         elif kind == 'RETURN':
             return self.parse_return()
         elif kind == 'PRINTF':
             return self.parse_printf()
+        elif kind == 'SCANF':
+            return self.parse_scanf()
         elif kind == 'LBRACE':
             return self.parse_block()
-        elif kind == 'ID':
-            return self.parse_assignment_or_expr()
         else:
-            # Expression statement or unknown
-            return self.parse_expr_stmt()
+            return self.parse_assignment_or_expr()
 
+    # ── Declarations ──────────────────────────────────────────────────────────
     def parse_declaration(self):
         node = ParseTreeNode('Declaration')
         type_tok = self.consume()
         node.line = type_tok['line']
-        node.add_child(ParseTreeNode('Type', type_tok['value'], type_tok['line']))
+        type_val = type_tok['value']
+        if self.match('TIMES'):
+            self.consume()
+            type_val += '*'
+        node.add_child(ParseTreeNode('Type', type_val, type_tok['line']))
 
         id_tok = self.expect('ID')
         if id_tok:
-            node.add_child(ParseTreeNode('Identifier', id_tok['value'], id_tok['line']))
+            id_node = ParseTreeNode('Identifier', id_tok['value'], id_tok['line'])
+            if self.match('LBRACKET'):
+                self.consume('LBRACKET')
+                size_tok = self.expect('NUMBER_INT')
+                self.expect('RBRACKET')
+                id_node.add_child(ParseTreeNode('ArraySize', size_tok['value'] if size_tok else None, size_tok['line'] if size_tok else None))
+            node.add_child(id_node)
 
         if self.match('ASSIGN'):
             self.consume()
@@ -116,26 +163,44 @@ class Parser:
             self.sync()
         return node
 
+    # ── Assignments (simple + compound) ───────────────────────────────────────
     def parse_assignment_or_expr(self):
-        # Look ahead: ID ASSIGN = assignment, else expr stmt
-        if (self.pos + 1 < len(self.tokens) and
-                self.tokens[self.pos + 1]['type'] == 'ASSIGN'):
-            return self.parse_assignment()
-        return self.parse_expr_stmt()
+        lhs = self.parse_expression()
+        
+        if self.match('ASSIGN'):
+            node = ParseTreeNode('Assignment')
+            node.line = lhs.line
+            node.add_child(lhs)
+            self.consume('ASSIGN')
+            node.add_child(ParseTreeNode('AssignOp', '='))
+            expr = self.parse_expression()
+            node.add_child(expr)
+            if not self.expect('SEMI'):
+                self.sync()
+            return node
+            
+        elif self.match(*COMPOUND_ASSIGN_OPS):
+            node = ParseTreeNode('CompoundAssignment')
+            node.line = lhs.line
+            node.add_child(lhs)
+            op_tok = self.consume()
+            node.add_child(ParseTreeNode('CompoundOp', op_tok['value'], op_tok['line']))
+            expr = self.parse_expression()
+            node.add_child(expr)
+            if not self.expect('SEMI'):
+                self.sync()
+            return node
+            
+        else:
+            # Standalone expression statement
+            node = ParseTreeNode('ExpressionStatement')
+            node.line = lhs.line
+            node.add_child(lhs)
+            if not self.expect('SEMI'):
+                self.sync()
+            return node
 
-    def parse_assignment(self):
-        node = ParseTreeNode('Assignment')
-        id_tok = self.consume()
-        node.line = id_tok['line']
-        node.add_child(ParseTreeNode('Identifier', id_tok['value'], id_tok['line']))
-        self.consume('ASSIGN')
-        node.add_child(ParseTreeNode('AssignOp', '='))
-        expr = self.parse_expression()
-        node.add_child(expr)
-        if not self.expect('SEMI'):
-            self.sync()
-        return node
-
+    # ── Control Flow ──────────────────────────────────────────────────────────
     def parse_if(self):
         node = ParseTreeNode('IfStatement')
         tok = self.consume('IF')
@@ -150,7 +215,11 @@ class Parser:
         if self.match('ELSE'):
             self.consume()
             node.add_child(ParseTreeNode('Keyword', 'else'))
-            else_body = self.parse_block()
+            if self.match('IF'):
+                # else if chain
+                else_body = self.parse_if()
+            else:
+                else_body = self.parse_block()
             node.add_child(else_body)
         return node
 
@@ -167,6 +236,203 @@ class Parser:
         node.add_child(body)
         return node
 
+    def parse_for(self):
+        node = ParseTreeNode('ForStatement')
+        tok = self.consume('FOR')
+        node.line = tok['line'] if tok else None
+        node.add_child(ParseTreeNode('Keyword', 'for', node.line))
+        self.expect('LPAREN')
+
+        # ── Init clause ──────────────────────────────────────────────────
+        init_node = ParseTreeNode('ForInit')
+        if self.match('SEMI'):
+            # Empty init
+            pass
+        elif self.match(*self.TYPE_TOKENS):
+            init_node.add_child(self._parse_for_declaration())
+        else:
+            init_node.add_child(self._parse_for_assign_or_expr())
+        node.add_child(init_node)
+        self.expect('SEMI')
+
+        # ── Condition clause ─────────────────────────────────────────────
+        cond_node = ParseTreeNode('ForCondition')
+        if not self.match('SEMI'):
+            cond_node.add_child(self.parse_expression())
+        node.add_child(cond_node)
+        self.expect('SEMI')
+
+        # ── Update clause ────────────────────────────────────────────────
+        update_node = ParseTreeNode('ForUpdate')
+        if not self.match('RPAREN'):
+            update_node.add_child(self._parse_for_update_expr())
+        node.add_child(update_node)
+        self.expect('RPAREN')
+
+        body = self.parse_block()
+        node.add_child(body)
+        return node
+
+    def _parse_for_declaration(self):
+        """Parse a declaration inside for-init (no trailing semicolon)."""
+        node = ParseTreeNode('Declaration')
+        type_tok = self.consume()
+        node.line = type_tok['line']
+        type_val = type_tok['value']
+        if self.match('TIMES'):
+            self.consume()
+            type_val += '*'
+        node.add_child(ParseTreeNode('Type', type_val, type_tok['line']))
+        id_tok = self.expect('ID')
+        if id_tok:
+            id_node = ParseTreeNode('Identifier', id_tok['value'], id_tok['line'])
+            if self.match('LBRACKET'):
+                self.consume('LBRACKET')
+                size_tok = self.expect('NUMBER_INT')
+                self.expect('RBRACKET')
+                id_node.add_child(ParseTreeNode('ArraySize', size_tok['value'] if size_tok else None, size_tok['line'] if size_tok else None))
+            node.add_child(id_node)
+        if self.match('ASSIGN'):
+            self.consume()
+            node.add_child(ParseTreeNode('AssignOp', '='))
+            expr = self.parse_expression()
+            node.add_child(expr)
+        return node
+
+    def _parse_for_assign_or_expr(self):
+        """Parse assignment or expression in for-init (no trailing semicolon)."""
+        lhs = self.parse_expression()
+        
+        if self.match('ASSIGN'):
+            node = ParseTreeNode('Assignment')
+            node.line = lhs.line
+            node.add_child(lhs)
+            self.consume('ASSIGN')
+            node.add_child(ParseTreeNode('AssignOp', '='))
+            expr = self.parse_expression()
+            node.add_child(expr)
+            return node
+            
+        elif self.match(*COMPOUND_ASSIGN_OPS):
+            node = ParseTreeNode('CompoundAssignment')
+            node.line = lhs.line
+            node.add_child(lhs)
+            op_tok = self.consume()
+            node.add_child(ParseTreeNode('CompoundOp', op_tok['value'], op_tok['line']))
+            expr = self.parse_expression()
+            node.add_child(expr)
+            return node
+            
+        else:
+            return lhs
+
+    def _parse_for_update_expr(self):
+        """Parse the update expression in a for-loop (no trailing semicolon)."""
+        return self._parse_for_assign_or_expr()
+
+    def parse_do_while(self):
+        node = ParseTreeNode('DoWhileStatement')
+        tok = self.consume('DO')
+        node.line = tok['line'] if tok else None
+        node.add_child(ParseTreeNode('Keyword', 'do', node.line))
+        body = self.parse_block()
+        node.add_child(body)
+        self.expect('WHILE')
+        node.add_child(ParseTreeNode('Keyword', 'while'))
+        self.expect('LPAREN')
+        cond = self.parse_expression()
+        node.add_child(cond)
+        self.expect('RPAREN')
+        if not self.expect('SEMI'):
+            self.sync()
+        return node
+
+    def parse_switch(self):
+        node = ParseTreeNode('SwitchStatement')
+        tok = self.consume('SWITCH')
+        node.line = tok['line'] if tok else None
+        node.add_child(ParseTreeNode('Keyword', 'switch', node.line))
+        self.expect('LPAREN')
+        expr = self.parse_expression()
+        node.add_child(expr)
+        self.expect('RPAREN')
+        self.expect('LBRACE')
+
+        while self.peek() and not self.match('RBRACE'):
+            if self.match('CASE'):
+                node.add_child(self.parse_case_clause())
+            elif self.match('DEFAULT'):
+                node.add_child(self.parse_default_clause())
+            else:
+                # Error recovery
+                peek_tok = self.peek()
+                line = peek_tok['line'] if peek_tok else '?'
+                val = peek_tok['value'] if peek_tok else 'EOF'
+                self.errors.append({
+                    'type': 'SYNTAX_ERROR',
+                    'line': line,
+                    'value': val,
+                    'message': f"Expected 'case' or 'default' in switch block at line {line}"
+                })
+                if peek_tok:
+                    self.pos += 1
+
+        self.expect('RBRACE')
+        return node
+
+    def parse_case_clause(self):
+        node = ParseTreeNode('CaseClause')
+        tok = self.consume('CASE')
+        node.line = tok['line'] if tok else None
+        node.add_child(ParseTreeNode('Keyword', 'case', node.line))
+        expr = self.parse_expression()
+        node.add_child(expr)
+        self.expect('COLON')
+
+        # Parse statements until next case / default / }
+        stmts = ParseTreeNode('StatementList')
+        while (self.peek() and
+               not self.match('CASE', 'DEFAULT', 'RBRACE')):
+            s = self.parse_statement()
+            if s:
+                stmts.add_child(s)
+        node.add_child(stmts)
+        return node
+
+    def parse_default_clause(self):
+        node = ParseTreeNode('DefaultClause')
+        tok = self.consume('DEFAULT')
+        node.line = tok['line'] if tok else None
+        node.add_child(ParseTreeNode('Keyword', 'default', node.line))
+        self.expect('COLON')
+
+        stmts = ParseTreeNode('StatementList')
+        while (self.peek() and
+               not self.match('CASE', 'DEFAULT', 'RBRACE')):
+            s = self.parse_statement()
+            if s:
+                stmts.add_child(s)
+        node.add_child(stmts)
+        return node
+
+    def parse_break(self):
+        node = ParseTreeNode('BreakStatement')
+        tok = self.consume('BREAK')
+        node.line = tok['line'] if tok else None
+        node.add_child(ParseTreeNode('Keyword', 'break', node.line))
+        if not self.expect('SEMI'):
+            self.sync()
+        return node
+
+    def parse_continue(self):
+        node = ParseTreeNode('ContinueStatement')
+        tok = self.consume('CONTINUE')
+        node.line = tok['line'] if tok else None
+        node.add_child(ParseTreeNode('Keyword', 'continue', node.line))
+        if not self.expect('SEMI'):
+            self.sync()
+        return node
+
     def parse_return(self):
         node = ParseTreeNode('ReturnStatement')
         tok = self.consume('RETURN')
@@ -181,6 +447,18 @@ class Parser:
     def parse_printf(self):
         node = ParseTreeNode('PrintfStatement')
         tok = self.consume('PRINTF')
+        node.line = tok['line'] if tok else None
+        self.expect('LPAREN')
+        args = self.parse_arg_list()
+        node.add_child(args)
+        self.expect('RPAREN')
+        if not self.expect('SEMI'):
+            self.sync()
+        return node
+
+    def parse_scanf(self):
+        node = ParseTreeNode('ScanfStatement')
+        tok = self.consume('SCANF')
         node.line = tok['line'] if tok else None
         self.expect('LPAREN')
         args = self.parse_arg_list()
@@ -207,6 +485,54 @@ class Parser:
             sl = self.parse_statement_list()
             node.add_child(sl)
         self.expect('RBRACE')
+        return node
+
+    # ── Function definitions ──────────────────────────────────────────────────
+    def parse_function_def(self):
+        node = ParseTreeNode('FunctionDecl')
+        type_tok = self.consume()
+        node.line = type_tok['line']
+        type_val = type_tok['value']
+        if self.match('TIMES'):
+            self.consume()
+            type_val += '*'
+        node.add_child(ParseTreeNode('Type', type_val, type_tok['line']))
+
+        id_tok = self.expect('ID')
+        if id_tok:
+            node.add_child(ParseTreeNode('Identifier', id_tok['value'], id_tok['line']))
+
+        self.expect('LPAREN')
+        params = self.parse_param_list()
+        node.add_child(params)
+        self.expect('RPAREN')
+
+        body = self.parse_block()
+        node.add_child(body)
+        return node
+
+    def parse_param_list(self):
+        node = ParseTreeNode('ParamList')
+        if not self.match('RPAREN'):
+            node.add_child(self.parse_param())
+            while self.match('COMMA'):
+                self.consume()
+                node.add_child(self.parse_param())
+        return node
+
+    def parse_param(self):
+        node = ParseTreeNode('Param')
+        type_tok = self.consume()
+        if type_tok:
+            node.line = type_tok['line']
+            type_val = type_tok['value']
+            if self.match('TIMES'):
+                self.consume()
+                type_val += '*'
+            node.add_child(ParseTreeNode('Type', type_val, type_tok['line']))
+        id_tok = self.expect('ID')
+        if id_tok:
+            node.add_child(ParseTreeNode('Identifier', id_tok['value'], id_tok['line']))
         return node
 
     def parse_expr_stmt(self):
@@ -254,7 +580,54 @@ class Parser:
             node = ParseTreeNode('UnaryOp', '-', tok['line'])
             node.add_child(self.parse_unary())
             return node
-        return self.parse_primary()
+        if self.match('TIMES'):
+            tok = self.consume()
+            node = ParseTreeNode('UnaryOp', '*', tok['line'])
+            node.add_child(self.parse_unary())
+            return node
+        if self.match('AMPERSAND'):
+            tok = self.consume()
+            node = ParseTreeNode('UnaryOp', '&', tok['line'])
+            node.add_child(self.parse_unary())
+            return node
+        # Prefix increment / decrement
+        if self.match('INCREMENT'):
+            tok = self.consume()
+            node = ParseTreeNode('PrefixOp', '++', tok['line'])
+            node.add_child(self.parse_unary())
+            return node
+        if self.match('DECREMENT'):
+            tok = self.consume()
+            node = ParseTreeNode('PrefixOp', '--', tok['line'])
+            node.add_child(self.parse_unary())
+            return node
+        return self.parse_postfix()
+
+    def parse_postfix(self):
+        """Parse postfix expressions: function calls, postfix ++ / --, array subscripts."""
+        node = self.parse_primary()
+        while True:
+            if self.match('INCREMENT'):
+                tok = self.consume()
+                wrapper = ParseTreeNode('PostfixOp', '++', tok['line'])
+                wrapper.add_child(node)
+                node = wrapper
+            elif self.match('DECREMENT'):
+                tok = self.consume()
+                wrapper = ParseTreeNode('PostfixOp', '--', tok['line'])
+                wrapper.add_child(node)
+                node = wrapper
+            elif self.match('LBRACKET'):
+                tok = self.consume()
+                wrapper = ParseTreeNode('SubscriptExpr', None, tok['line'])
+                wrapper.add_child(node)
+                expr = self.parse_expression()
+                wrapper.add_child(expr)
+                self.expect('RBRACKET')
+                node = wrapper
+            else:
+                break
+        return node
 
     def parse_primary(self):
         t = self.peek()
@@ -287,6 +660,15 @@ class Parser:
             return ParseTreeNode('StringLiteral', t['value'], t['line'])
         elif kind == 'ID':
             self.consume()
+            # Check for function call: ID ( args )
+            if self.match('LPAREN'):
+                call_node = ParseTreeNode('FunctionCall', t['value'], t['line'])
+                call_node.add_child(ParseTreeNode('Identifier', t['value'], t['line']))
+                self.consume('LPAREN')
+                args = self.parse_arg_list()
+                call_node.add_child(args)
+                self.expect('RPAREN')
+                return call_node
             return ParseTreeNode('Identifier', t['value'], t['line'])
         else:
             self.errors.append({

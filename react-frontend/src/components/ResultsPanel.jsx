@@ -11,10 +11,17 @@ function TokensTable({ tokens }) {
   }
 
   const tokenClass = (type) => {
-    const KEYWORDS = new Set(['INT','FLOAT','CHAR','VOID','IF','ELSE','WHILE','RETURN','PRINTF']);
+    const KEYWORDS = new Set([
+      'INT','FLOAT','CHAR','VOID','IF','ELSE','WHILE','RETURN','PRINTF',
+      'FOR', 'DO', 'SWITCH', 'CASE', 'DEFAULT', 'BREAK', 'CONTINUE', 'SCANF'
+    ]);
     const LITERALS = new Set(['NUMBER_INT','NUMBER_FLOAT','CHAR_LITERAL','STRING_LITERAL']);
-    const OPERATORS = new Set(['PLUS','MINUS','TIMES','DIVIDE','MODULO','EQ','NEQ','LT','GT','LEQ','GEQ','ASSIGN','AND','OR','NOT']);
-    const PUNCT = new Set(['LPAREN','RPAREN','LBRACE','RBRACE','SEMI','COMMA']);
+    const OPERATORS = new Set([
+      'PLUS','MINUS','TIMES','DIVIDE','MODULO','EQ','NEQ','LT','GT','LEQ','GEQ','ASSIGN',
+      'AND','OR','NOT','AMPERSAND','INCREMENT','DECREMENT',
+      'PLUS_ASSIGN','MINUS_ASSIGN','TIMES_ASSIGN','DIVIDE_ASSIGN','MODULO_ASSIGN','ARROW'
+    ]);
+    const PUNCT = new Set(['LPAREN','RPAREN','LBRACE','RBRACE','LBRACKET','RBRACKET','SEMI','COLON','COMMA']);
     
     if (KEYWORDS.has(type)) return 'tt-keyword';
     if (type === 'ID') return 'tt-id';
@@ -85,15 +92,26 @@ function SymbolTable({ symbols }) {
       <div className="phase-label">Phase 3 — Symbol Table · {symbols.length} symbol(s)</div>
       <table className="token-table">
         <thead>
-          <tr><th>Name</th><th>Type</th><th>Scope</th><th>Line</th></tr>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Scope</th>
+            <th>Line</th>
+            <th>Array Size</th>
+            <th>Ptr Depth</th>
+            <th>Parameters</th>
+          </tr>
         </thead>
         <tbody>
           {symbols.map((s, i) => (
             <tr key={i}>
-              <td>{escapeHtml(s.name)}</td>
+              <td><strong>{escapeHtml(s.name)}</strong></td>
               <td><span className="token-type tt-keyword">{s.type}</span></td>
               <td><span style={{color:'var(--muted)', fontSize:'11px'}}>{s.scope}</span></td>
               <td>{s.line}</td>
+              <td>{s.array_dims ? <span className="token-type tt-literal">{s.array_dims}</span> : <span style={{color:'var(--muted)'}}>—</span>}</td>
+              <td>{s.ptr_depth > 0 ? <span className="token-type tt-operator">{s.ptr_depth}</span> : <span style={{color:'var(--muted)'}}>—</span>}</td>
+              <td>{s.params ? <span className="token-type tt-id" style={{fontSize: '11px'}}>{s.params}</span> : <span style={{color:'var(--muted)'}}>—</span>}</td>
             </tr>
           ))}
         </tbody>

@@ -1,15 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Editor from './components/Editor';
 import ResultsPanel from './components/ResultsPanel';
 
 function App() {
   const [code, setCode] = useState(() => {
-    return `// While Loop\nint i = 0;\nint sum = 0;\nwhile (i < 10) {\n    sum = sum + i;\n    i = i + 1;\n}\nreturn sum;`;
+    return `// Rich Mini-C Demo (Functions, Loops, Pointers, Arrays)\nint add(int a, int b) {\n    return a + b;\n}\n\nint main() {\n    int arr[3];\n    arr[0] = 10;\n    arr[1] = 20;\n\n    int sum = 0;\n    for (int i = 0; i < 2; i++) {\n        sum = add(sum, arr[i]);\n    }\n\n    int *p = &sum;\n    *p += 5;\n\n    printf("Total sum: %d", sum);\n    return sum;\n}`;
   });
   
   const [compilationData, setCompilationData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
+
+  // Split-resizer state
+  const [editorWidth, setEditorWidth] = useState(450);
+  const [isResizing, setIsResizing] = useState(false);
+
+  const startResizing = useCallback((e) => {
+    e.preventDefault();
+    setIsResizing(true);
+    document.body.classList.add('is-resizing');
+  }, []);
+
+  const stopResizing = useCallback(() => {
+    setIsResizing(false);
+    document.body.classList.remove('is-resizing');
+  }, []);
+
+  const resize = useCallback((e) => {
+    if (isResizing) {
+      const minWidth = 280;
+      const maxWidth = window.innerWidth * 0.8;
+      const newWidth = Math.max(minWidth, Math.min(e.clientX, maxWidth));
+      setEditorWidth(newWidth);
+    }
+  }, [isResizing]);
+
+  useEffect(() => {
+    if (isResizing) {
+      window.addEventListener('mousemove', resize);
+      window.addEventListener('mouseup', stopResizing);
+    }
+    return () => {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResizing);
+    };
+  }, [isResizing, resize, stopResizing]);
 
   const handleValidate = async () => {
     if (!code.trim()) return;
@@ -44,12 +79,16 @@ function App() {
         <div className="badge">v2.0 (React)</div>
       </header>
       
-      <div className="main">
+      <div className="main" style={{ gridTemplateColumns: `${editorWidth}px 6px 1fr` }}>
         <Editor 
           code={code} 
           setCode={setCode} 
           onValidate={handleValidate} 
           isLoading={isLoading} 
+        />
+        <div 
+          className={`resizer-bar ${isResizing ? 'resizing' : ''}`} 
+          onMouseDown={startResizing} 
         />
         <ResultsPanel 
           data={compilationData} 

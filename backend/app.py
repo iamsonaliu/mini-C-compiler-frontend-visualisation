@@ -8,8 +8,8 @@ from semantic import SemanticAnalyzer
 
 app = Flask(
     __name__,
-    static_folder=os.path.join(os.path.dirname(__file__), '..', 'react-frontend', 'dist'),
-    static_url_path='/'
+    template_folder=os.path.join(os.path.dirname(__file__), '..', 'frontend', 'templates'),
+    static_folder=os.path.join(os.path.dirname(__file__), '..', 'frontend', 'static')
 )
 
 @app.after_request
@@ -21,7 +21,7 @@ def add_cors(response):
 
 @app.route('/')
 def index():
-    return app.send_static_file('index.html')
+    return render_template('index.html')
 
 @app.route('/api/compile', methods=['POST', 'OPTIONS'])
 def compile_code():
@@ -55,7 +55,7 @@ def compile_code():
         if lex_errors: parts.append(f"{len(lex_errors)} lexical error(s)")
         if syn_errors: parts.append(f"{len(syn_errors)} syntax error(s)")
         if sem_errors: parts.append(f"{len(sem_errors)} semantic error(s)")
-        msg = 'Compilation failed: ' + ', '.join(parts)
+        msg = ' Compilation failed: ' + ', '.join(parts)
 
     return jsonify({
         'tokens':            tokens_list,

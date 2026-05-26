@@ -1,16 +1,25 @@
-# React + Vite
+# 🎨 Mini-C Compiler Visualizer Frontend (React + Vite)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This is the interactive frontend for the **Mini-C Compiler Front-End Visualizer**. It is built using **React**, **Vite**, **D3.js**, and vanilla CSS.
 
-Currently, two official plugins are available:
+## Features implemented here:
+- **Workspace Split Resizer**: Interactive draggable divider bar to adjust code editor and results panel width according to developer demands.
+- **Interactive Parse Tree**: Rendered dynamically using D3.js, supporting node collapse/expand, fluid panning, and zoom controls.
+- **Diagnostics Console**: Display panels for compiled Token Stream, active Scope-aware Symbol Table, and full Lexical/Syntax/Semantic Compiler errors and warnings.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Development Setup
 
-## React Compiler
+To run the frontend locally:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+# Install NPM dependencies
+npm install
 
-## Expanding the ESLint configuration
+# Run the local development server (typically launches on http://localhost:5173)
+npm run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+> [!NOTE]
+> Make sure the Python Flask backend is running on `http://localhost:5000` to handle compilation and semantic analysis requests.
+
+For full architectural diagrams, grammar specifications, and backend details, please refer to the [Root README](../README.md).

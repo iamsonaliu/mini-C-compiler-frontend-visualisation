@@ -1,27 +1,35 @@
-"""
-Pure-Python lexer for Mini-C (no external dependencies).
-"""
-
 import re
 
 RESERVED = {
     'int', 'float', 'char', 'void',
-    'if', 'else', 'while', 'return', 'printf',
+    'if', 'else', 'while', 'for', 'do',
+    'break', 'continue',
+    'switch', 'case', 'default',
+    'return', 'printf', 'scanf',
 }
 
 TOKEN_SPEC = [
-    ('BLOCK_COMMENT',  r'/\*(.|\n)*?\*/'),
+    ('BLOCK_COMMENT',  r'/\*[\s\S]*?\*/'),
     ('LINE_COMMENT',   r'//[^\n]*'),
     ('NUMBER_FLOAT',   r'\d+\.\d+'),
     ('NUMBER_INT',     r'\d+'),
     ('CHAR_LITERAL',   r"'(\\.|[^'\\])'"),
     ('STRING_LITERAL', r'"(\\.|[^"\\])*"'),
+    ('INCREMENT',      r'\+\+'),
+    ('DECREMENT',      r'--'),
+    ('PLUS_ASSIGN',    r'\+='),
+    ('MINUS_ASSIGN',   r'-='),
+    ('TIMES_ASSIGN',   r'\*='),
+    ('DIVIDE_ASSIGN',  r'/='),
+    ('MODULO_ASSIGN',  r'%='),
+    ('ARROW',          r'->'),
     ('LEQ',            r'<='),
     ('GEQ',            r'>='),
     ('EQ',             r'=='),
     ('NEQ',            r'!='),
     ('AND',            r'&&'),
     ('OR',             r'\|\|'),
+    ('AMPERSAND',      r'&'),
     ('ASSIGN',         r'='),
     ('PLUS',           r'\+'),
     ('MINUS',          r'-'),
@@ -35,7 +43,10 @@ TOKEN_SPEC = [
     ('RPAREN',         r'\)'),
     ('LBRACE',         r'\{'),
     ('RBRACE',         r'\}'),
+    ('LBRACKET',       r'\['),
+    ('RBRACKET',       r'\]'),
     ('SEMI',           r';'),
+    ('COLON',          r':'),
     ('COMMA',          r','),
     ('ID',             r'[A-Za-z_]\w*'),
     ('NEWLINE',        r'\n'),
