@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Mini-C Compiler · Front-End Visualizer</title>
+  <meta name="description" content="Interactive Mini-C compiler front-end visualizer with lexical analysis, parsing, and semantic checks."/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
@@ -15,12 +16,17 @@
       --bg:        #0b0d12;
       --surface:   #111420;
       --surface2:  #181c2a;
+      --surface3:  #1e2235;
       --border:    #232840;
+      --border-glow: rgba(91,143,255,0.3);
       --accent:    #5b8fff;
       --accent2:   #a78bfa;
+      --accent3:   #6ee7b7;
       --green:     #34d399;
       --red:       #f87171;
       --yellow:    #fbbf24;
+      --orange:    #fb923c;
+      --cyan:      #22d3ee;
       --text:      #e2e8f0;
       --muted:     #64748b;
       --radius:    10px;
@@ -67,6 +73,7 @@
       display: flex; align-items: center; justify-content: center;
       font-size: 14px; font-weight: 700; color: #fff;
       font-family: var(--mono);
+      box-shadow: 0 2px 12px rgba(91,143,255,0.25);
     }
 
     .logo-text {
@@ -87,10 +94,16 @@
       letter-spacing: 0.05em;
     }
 
+    .badge-new {
+      background: linear-gradient(135deg, rgba(91,143,255,0.15), rgba(167,139,250,0.15));
+      border-color: rgba(91,143,255,0.3);
+      color: var(--accent);
+    }
+
     /* ── Main split ───────────────────────────────────────────────────────── */
     .main {
       display: grid;
-      grid-template-columns: 420px 1fr;
+      grid-template-columns: 460px 1fr;
       overflow: hidden;
     }
 
@@ -101,6 +114,11 @@
       border-right: 1px solid var(--border);
       background: var(--surface);
       overflow: hidden;
+      transition: border-color 0.3s;
+    }
+
+    .left-panel:focus-within {
+      border-right-color: var(--border-glow);
     }
 
     .panel-header {
@@ -129,9 +147,39 @@
       flex: 1;
       position: relative;
       overflow: hidden;
+      display: flex;
+    }
+
+    /* ── Line numbers gutter ─────────────────────────────────────────────── */
+    #line-numbers {
+      width: 44px;
+      padding: 16px 8px 16px 4px;
+      background: #0a0c10;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.7;
+      text-align: right;
+      overflow: hidden;
+      user-select: none;
+      border-right: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .line-num {
+      display: block;
+      height: 1.7em;
+      opacity: 0.5;
+      transition: opacity 0.15s;
+    }
+
+    .line-num.active {
+      opacity: 1;
+      color: var(--accent);
     }
 
     textarea#code-input {
+      flex: 1;
       width: 100%; height: 100%;
       background: #0e1117;
       color: #e2e8f0;
@@ -144,6 +192,9 @@
       padding: 16px;
       tab-size: 4;
       caret-color: var(--accent);
+      white-space: pre;
+      overflow-wrap: normal;
+      overflow-x: auto;
     }
 
     textarea#code-input::selection { background: rgba(91,143,255,0.25); }
@@ -157,6 +208,19 @@
       gap: 10px;
     }
 
+    .footer-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #line-col-indicator {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.03em;
+    }
+
     .example-select {
       font-family: var(--mono);
       font-size: 11px;
@@ -167,6 +231,7 @@
       padding: 5px 10px;
       cursor: pointer;
       outline: none;
+      transition: border-color 0.2s;
     }
 
     .example-select:focus { border-color: var(--accent); }
@@ -185,10 +250,11 @@
       font-weight: 700;
       cursor: pointer;
       letter-spacing: 0.03em;
-      transition: opacity 0.2s, transform 0.1s;
+      transition: opacity 0.2s, transform 0.1s, box-shadow 0.3s;
+      box-shadow: 0 2px 16px rgba(91,143,255,0.2);
     }
 
-    #validate-btn:hover   { opacity: 0.88; }
+    #validate-btn:hover   { opacity: 0.92; box-shadow: 0 4px 24px rgba(91,143,255,0.35); }
     #validate-btn:active  { transform: scale(0.97); }
     #validate-btn.loading { opacity: 0.6; cursor: not-allowed; }
 
@@ -223,6 +289,7 @@
       transition: color 0.15s, border-color 0.15s;
       font-family: var(--sans);
       text-transform: uppercase;
+      position: relative;
     }
 
     .tab:hover   { color: var(--text); }
@@ -245,6 +312,7 @@
 
     .tab-badge.error  { background: rgba(248,113,113,0.2); color: var(--red); }
     .tab-badge.ok     { background: rgba(52,211,153,0.2); color: var(--green); }
+    .tab-badge.warn   { background: rgba(251,191,36,0.2); color: var(--yellow); }
 
     .tab-content {
       flex: 1;
@@ -267,12 +335,32 @@
       font-size: 12px;
       font-weight: 500;
       border-bottom: 1px solid var(--border);
+      animation: bannerSlide 0.3s ease-out;
+    }
+
+    @keyframes bannerSlide {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
 
     #status-banner.success { background: rgba(52,211,153,0.08); color: var(--green); }
     #status-banner.error   { background: rgba(248,113,113,0.08); color: var(--red); }
 
     .status-icon { font-size: 16px; }
+
+    .status-stats {
+      margin-left: auto;
+      display: flex;
+      gap: 12px;
+      font-size: 11px;
+    }
+
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      opacity: 0.8;
+    }
 
     /* ── Token Table ──────────────────────────────────────────────────────── */
     .tokens-container {
@@ -288,6 +376,15 @@
       color: var(--muted);
       text-transform: uppercase;
       margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .phase-label .phase-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
     }
 
     table.token-table {
@@ -306,6 +403,9 @@
       letter-spacing: 0.08em;
       text-transform: uppercase;
       border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 1;
     }
 
     .token-table td {
@@ -313,6 +413,7 @@
       border-bottom: 1px solid rgba(35,40,64,0.5);
     }
 
+    .token-table tr { transition: background 0.1s; }
     .token-table tr:hover td { background: var(--surface2); }
 
     .token-type {
@@ -347,6 +448,18 @@
       font-family: var(--mono);
       font-size: 12px;
       line-height: 1.6;
+      transition: transform 0.1s, box-shadow 0.2s;
+      animation: cardIn 0.25s ease-out both;
+    }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .error-card:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
     }
 
     .error-card.lex     { background: rgba(248,113,113,0.07); border-color: rgba(248,113,113,0.25); }
@@ -429,10 +542,10 @@
       cursor: pointer;
       font-size: 15px;
       display: flex; align-items: center; justify-content: center;
-      transition: background 0.15s;
+      transition: background 0.15s, border-color 0.2s;
     }
 
-    .tree-btn:hover { background: var(--surface2); }
+    .tree-btn:hover { background: var(--surface2); border-color: var(--accent); }
 
     .tree-empty {
       position: absolute;
@@ -450,10 +563,10 @@
       fill: var(--surface2);
       stroke: var(--accent);
       stroke-width: 1.5;
-      transition: fill 0.15s;
+      transition: fill 0.15s, stroke 0.15s;
     }
 
-    .node:hover circle { fill: rgba(91,143,255,0.15); }
+    .node:hover circle { fill: rgba(91,143,255,0.15); stroke-width: 2.5; }
 
     .node.terminal circle {
       fill: rgba(52,211,153,0.1);
@@ -497,6 +610,15 @@
 
     .placeholder-icon { font-size: 42px; opacity: 0.4; }
     .placeholder p    { font-size: 13px; max-width: 240px; line-height: 1.6; }
+    .placeholder .kbd {
+      font-family: var(--mono);
+      font-size: 11px;
+      background: var(--surface2);
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
 
     /* ── Loading spinner ──────────────────────────────────────────────────── */
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -507,6 +629,17 @@
       border-top-color: #fff;
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
+    }
+
+    /* ── Optgroup styling ─────────────────────────────────────────────────── */
+    .example-select optgroup {
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .example-select option {
+      color: var(--text);
+      background: var(--surface2);
     }
   </style>
 </head>
@@ -519,9 +652,9 @@
       <div class="logo-icon">C</div>
       <div class="logo-text">Mini-<span>C</span> Compiler</div>
     </div>
-    <div class="badge">FRONT-END VISUALIZER</div>
+    <div class="badge badge-new">FRONT-END VISUALIZER</div>
     <div class="header-sep"></div>
-    <div class="badge">v1.0</div>
+    <div class="badge">v2.0</div>
   </header>
 
   <!-- Main -->
@@ -538,6 +671,7 @@
       </div>
 
       <div id="editor-container">
+        <div id="line-numbers"></div>
         <textarea id="code-input" spellcheck="false" placeholder="// Enter Mini-C code here...
 int main() {
     int x = 10;
@@ -546,19 +680,40 @@ int main() {
       </div>
 
       <div class="editor-footer">
-        <select class="example-select" id="example-select" title="Load example">
-          <option value="">Load example…</option>
-          <option value="hello">Hello World</option>
-          <option value="arithmetic">Arithmetic</option>
-          <option value="if_else">If / Else</option>
-          <option value="while_loop">While Loop</option>
-          <option value="undeclared">⚠ Undeclared Var</option>
-          <option value="duplicate">⚠ Duplicate Decl</option>
-          <option value="syntax_err">⚠ Syntax Error</option>
-        </select>
+        <div class="footer-left">
+          <select class="example-select" id="example-select" title="Load example">
+            <option value="">Load example…</option>
+            <optgroup label="Basics">
+              <option value="hello">Hello World</option>
+              <option value="arithmetic">Arithmetic</option>
+              <option value="if_else">If / Else / Else-If</option>
+            </optgroup>
+            <optgroup label="Loops">
+              <option value="while_loop">While Loop</option>
+              <option value="for_loop">For Loop</option>
+              <option value="do_while">Do-While Loop</option>
+              <option value="nested_loops">Nested Loops</option>
+              <option value="break_continue">Break / Continue</option>
+            </optgroup>
+            <optgroup label="Advanced">
+              <option value="switch_case">Switch / Case</option>
+              <option value="functions">Functions</option>
+              <option value="compound_ops">Compound Assignment (+=)</option>
+              <option value="increment">Increment / Decrement</option>
+            </optgroup>
+            <optgroup label="Error Cases">
+              <option value="undeclared">⚠ Undeclared Var</option>
+              <option value="duplicate">⚠ Duplicate Decl</option>
+              <option value="syntax_err">⚠ Syntax Error</option>
+              <option value="break_outside">⚠ Break Outside Loop</option>
+              <option value="func_err">⚠ Wrong Arg Count</option>
+            </optgroup>
+          </select>
+          <span id="line-col-indicator">Ln 1, Col 1</span>
+        </div>
         <button id="validate-btn">
           <span class="btn-icon">▶</span>
-          Validate
+          Compile
         </button>
       </div>
     </div>
@@ -568,6 +723,7 @@ int main() {
       <div id="status-banner">
         <span class="status-icon" id="status-icon"></span>
         <span id="status-text"></span>
+        <div class="status-stats" id="status-stats"></div>
       </div>
 
       <div class="tabs">
@@ -582,7 +738,8 @@ int main() {
         <div class="tokens-container" id="tokens-content">
           <div class="placeholder">
             <div class="placeholder-icon">⬡</div>
-            <p>Token stream will appear here after validation.</p>
+            <p>Token stream will appear here after compilation.</p>
+            <span class="kbd">Ctrl + Enter</span>
           </div>
         </div>
       </div>
@@ -598,11 +755,11 @@ int main() {
       </div>
 
       <!-- Parse Tree Tab -->
-      <div class="tab-content" id="tab-tree" id="tree-tab">
+      <div class="tab-content" id="tab-tree">
         <div id="tree-container">
           <div class="tree-empty" id="tree-empty">
             <div class="tree-empty-icon">🌲</div>
-            <p>Parse tree will render here after validation.</p>
+            <p>Parse tree will render here after compilation.</p>
           </div>
           <svg id="tree-svg"></svg>
           <div class="tree-controls">
@@ -618,7 +775,7 @@ int main() {
         <div class="symbols-container" id="symbols-content">
           <div class="placeholder">
             <div class="placeholder-icon">⬡</div>
-            <p>Symbol table will appear here after validation.</p>
+            <p>Symbol table will appear here after compilation.</p>
           </div>
         </div>
       </div>
@@ -639,15 +796,21 @@ int b = 5;
 int sum = a + b;
 int diff = a - b;
 float ratio = 3.14;
-int product = a * b;`,
+int product = a * b;
+int mod = a % b;`,
 
-  if_else: `// If-Else Statement
+  if_else: `// If-Else / Else-If chain
 int score = 85;
 int grade = 0;
+
 if (score >= 90) {
-    grade = 1;
+    grade = 4;
+} else if (score >= 80) {
+    grade = 3;
+} else if (score >= 70) {
+    grade = 2;
 } else {
-    grade = 0;
+    grade = 1;
 }
 return grade;`,
 
@@ -659,6 +822,103 @@ while (i < 10) {
     i = i + 1;
 }
 return sum;`,
+
+  for_loop: `// For Loop — classic counter
+int sum = 0;
+for (int i = 0; i < 10; i++) {
+    sum += i;
+}
+printf("Sum = %d", sum);
+return sum;`,
+
+  do_while: `// Do-While Loop
+// Executes at least once
+int count = 0;
+int x = 100;
+do {
+    x = x / 2;
+    count++;
+} while (x > 1);
+printf("Halved %d times", count);
+return count;`,
+
+  nested_loops: `// Nested Loops — multiplication table
+int result = 0;
+for (int i = 1; i <= 3; i++) {
+    for (int j = 1; j <= 3; j++) {
+        result = i * j;
+        printf("%d x %d = %d", i, j, result);
+    }
+}
+return 0;`,
+
+  break_continue: `// Break and Continue
+int sum = 0;
+for (int i = 0; i < 20; i++) {
+    if (i % 2 == 0) {
+        continue;
+    }
+    if (i > 15) {
+        break;
+    }
+    sum += i;
+}
+return sum;`,
+
+  switch_case: `// Switch-Case Statement
+int day = 3;
+int type = 0;
+switch (day) {
+    case 1:
+        type = 1;
+        break;
+    case 2:
+        type = 1;
+        break;
+    case 3:
+        type = 2;
+        break;
+    default:
+        type = 0;
+        break;
+}
+return type;`,
+
+  functions: `// Function Definitions
+int add(int a, int b) {
+    return a + b;
+}
+
+int multiply(int x, int y) {
+    int result = x * y;
+    return result;
+}
+
+int main() {
+    int sum = add(3, 5);
+    int prod = multiply(4, 6);
+    printf("Sum: %d, Product: %d", sum, prod);
+    return 0;
+}`,
+
+  compound_ops: `// Compound Assignment Operators
+int x = 10;
+x += 5;
+x -= 3;
+x *= 2;
+x /= 4;
+printf("Result: %d", x);
+return x;`,
+
+  increment: `// Increment and Decrement
+int a = 5;
+a++;
+a++;
+a--;
+int b = 0;
+++b;
+printf("a = %d, b = %d", a, b);
+return a + b;`,
 
   undeclared: `// Semantic Error: Undeclared variable
 int x = 10;
@@ -674,12 +934,28 @@ return count;`,
 int x = 10
 int y = 20;
 return x + y;`,
+
+  break_outside: `// Semantic Error: break outside loop
+int x = 5;
+break;
+return x;`,
+
+  func_err: `// Semantic Error: Wrong argument count
+int add(int a, int b) {
+    return a + b;
+}
+
+int main() {
+    int r = add(1, 2, 3);
+    return r;
+}`,
 };
 
 // ── Load examples ─────────────────────────────────────────────────────────────
 document.getElementById('example-select').addEventListener('change', e => {
   if (e.target.value && EXAMPLES[e.target.value]) {
     document.getElementById('code-input').value = EXAMPLES[e.target.value];
+    updateLineNumbers();
     e.target.value = '';
   }
 });
@@ -697,10 +973,19 @@ document.querySelectorAll('.tab').forEach(tab => {
 });
 
 // ── Token type classifier ─────────────────────────────────────────────────────
-const KEYWORDS = new Set(['INT','FLOAT','CHAR','VOID','IF','ELSE','WHILE','RETURN','PRINTF']);
+const KEYWORDS = new Set([
+  'INT','FLOAT','CHAR','VOID','IF','ELSE','WHILE','FOR','DO',
+  'BREAK','CONTINUE','SWITCH','CASE','DEFAULT','RETURN','PRINTF','SCANF'
+]);
 const LITERALS  = new Set(['NUMBER_INT','NUMBER_FLOAT','CHAR_LITERAL','STRING_LITERAL']);
-const OPERATORS = new Set(['PLUS','MINUS','TIMES','DIVIDE','MODULO','EQ','NEQ','LT','GT','LEQ','GEQ','ASSIGN','AND','OR','NOT']);
-const PUNCT     = new Set(['LPAREN','RPAREN','LBRACE','RBRACE','SEMI','COMMA']);
+const OPERATORS = new Set([
+  'PLUS','MINUS','TIMES','DIVIDE','MODULO',
+  'EQ','NEQ','LT','GT','LEQ','GEQ',
+  'ASSIGN','AND','OR','NOT',
+  'INCREMENT','DECREMENT',
+  'PLUS_ASSIGN','MINUS_ASSIGN','TIMES_ASSIGN','DIVIDE_ASSIGN'
+]);
+const PUNCT = new Set(['LPAREN','RPAREN','LBRACE','RBRACE','LBRACKET','RBRACKET','SEMI','COMMA','COLON']);
 
 function tokenClass(type) {
   if (KEYWORDS.has(type))  return 'tt-keyword';
@@ -711,6 +996,76 @@ function tokenClass(type) {
   return 'tt-error';
 }
 
+// ── Line numbers ──────────────────────────────────────────────────────────────
+const codeInput = document.getElementById('code-input');
+const lineNumbers = document.getElementById('line-numbers');
+
+function updateLineNumbers() {
+  const lines = codeInput.value.split('\n');
+  const count = lines.length;
+  let html = '';
+  for (let i = 1; i <= count; i++) {
+    html += `<span class="line-num">${i}</span>`;
+  }
+  lineNumbers.innerHTML = html;
+}
+
+function syncScroll() {
+  lineNumbers.scrollTop = codeInput.scrollTop;
+}
+
+codeInput.addEventListener('input', updateLineNumbers);
+codeInput.addEventListener('scroll', syncScroll);
+codeInput.addEventListener('keydown', handleEditorKeys);
+
+// ── Auto-indent & Tab support ─────────────────────────────────────────────────
+function handleEditorKeys(e) {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const start = codeInput.selectionStart;
+    const end = codeInput.selectionEnd;
+    codeInput.value = codeInput.value.substring(0, start) + '    ' + codeInput.value.substring(end);
+    codeInput.selectionStart = codeInput.selectionEnd = start + 4;
+    updateLineNumbers();
+    return;
+  }
+
+  if (e.key === 'Enter') {
+    const start = codeInput.selectionStart;
+    const textBefore = codeInput.value.substring(0, start);
+    const currentLine = textBefore.split('\n').pop();
+    const indent = currentLine.match(/^\s*/)[0];
+
+    // Extra indent after {
+    const lastNonSpace = textBefore.trimEnd().slice(-1);
+    const extraIndent = lastNonSpace === '{' ? '    ' : '';
+
+    e.preventDefault();
+    const newText = '\n' + indent + extraIndent;
+    codeInput.value = codeInput.value.substring(0, start) + newText + codeInput.value.substring(codeInput.selectionEnd);
+    codeInput.selectionStart = codeInput.selectionEnd = start + newText.length;
+    updateLineNumbers();
+  }
+}
+
+// ── Line/Column indicator ─────────────────────────────────────────────────────
+codeInput.addEventListener('click', updateCursorPos);
+codeInput.addEventListener('keyup', updateCursorPos);
+
+function updateCursorPos() {
+  const pos = codeInput.selectionStart;
+  const textBefore = codeInput.value.substring(0, pos);
+  const lines = textBefore.split('\n');
+  const lineNum = lines.length;
+  const col = lines[lines.length - 1].length + 1;
+  document.getElementById('line-col-indicator').textContent = `Ln ${lineNum}, Col ${col}`;
+
+  // Highlight current line number
+  document.querySelectorAll('.line-num').forEach((el, i) => {
+    el.classList.toggle('active', i === lineNum - 1);
+  });
+}
+
 // ── Render tokens ─────────────────────────────────────────────────────────────
 function renderTokens(tokens) {
   const el = document.getElementById('tokens-content');
@@ -719,15 +1074,15 @@ function renderTokens(tokens) {
     return;
   }
 
-  const rows = tokens.map(t => `
-    <tr>
+  const rows = tokens.map((t, i) => `
+    <tr style="animation-delay: ${Math.min(i * 8, 400)}ms">
       <td>${t.line}</td>
       <td><span class="token-type ${tokenClass(t.type)}">${t.type}</span></td>
       <td>${escapeHtml(String(t.value))}</td>
     </tr>`).join('');
 
   el.innerHTML = `
-    <div class="phase-label">Phase 1 — Lexical Analysis · ${tokens.length} tokens</div>
+    <div class="phase-label"><span class="phase-dot"></span> Phase 1 — Lexical Analysis · ${tokens.length} tokens</div>
     <table class="token-table">
       <thead>
         <tr><th>Line</th><th>Type</th><th>Value</th></tr>
@@ -750,15 +1105,16 @@ function renderErrors(lexErrors, synErrors, semErrors, semWarnings) {
     el.innerHTML = `
       <div class="no-errors">
         <div class="no-errors-icon">✓</div>
-        <p>No errors detected.</p>
+        <p>No errors or warnings detected — all clear!</p>
       </div>`;
     return;
   }
 
   const tagLabel = { lex: 'Lexical', syn: 'Syntax', sem: 'Semantic', warn: 'Warning' };
-  const cards = all.map(e => `
-    <div class="error-card ${e.phase}">
-      <span class="error-tag tag-${e.phase}">${tagLabel[e.phase]}</span>
+  const tagIcon  = { lex: '✗', syn: '✗', sem: '✗', warn: '⚠' };
+  const cards = all.map((e, i) => `
+    <div class="error-card ${e.phase}" style="animation-delay: ${i * 50}ms">
+      <span class="error-tag tag-${e.phase}">${tagIcon[e.phase]} ${tagLabel[e.phase]}</span>
       ${escapeHtml(e.message)}
       ${e.line ? `<div class="error-line">↳ Line ${e.line}</div>` : ''}
     </div>`).join('');
@@ -779,17 +1135,22 @@ function renderSymbols(symbols) {
   }
 
   const rows = symbols.map(s => {
-    // Style adjustments for unused variables
+    const isFunc = s.name.endsWith('()');
     const rowStyle = s.used ? '' : 'opacity: 0.6;';
-    const usageBadge = s.used 
-      ? '<span class="token-type tt-literal" style="font-size:9px; margin-left:8px;">USED</span>' 
-      : '<span class="token-type tt-error" style="font-size:9px; margin-left:8px; opacity:0.8;">UNUSED</span>';
+    let usageBadge;
+    if (isFunc) {
+      usageBadge = '<span class="token-type tt-keyword" style="font-size:9px; margin-left:8px;">FUNC</span>';
+    } else if (s.used) {
+      usageBadge = '<span class="token-type tt-literal" style="font-size:9px; margin-left:8px;">USED</span>';
+    } else {
+      usageBadge = '<span class="token-type tt-error" style="font-size:9px; margin-left:8px; opacity:0.8;">UNUSED</span>';
+    }
 
     return `
     <tr style="${rowStyle}">
       <td>
         <div style="display:flex; align-items:center;">
-          ${escapeHtml(s.name)} 
+          ${escapeHtml(s.name)}
           ${usageBadge}
         </div>
       </td>
@@ -800,7 +1161,7 @@ function renderSymbols(symbols) {
   }).join('');
 
   el.innerHTML = `
-    <div class="phase-label">Phase 3 — Symbol Table · ${symbols.length} symbol(s)</div>
+    <div class="phase-label"><span class="phase-dot"></span> Phase 3 — Symbol Table · ${symbols.length} symbol(s)</div>
     <table class="token-table">
       <thead>
         <tr><th>Name & Status</th><th>Type</th><th>Scope</th><th>Line</th></tr>
@@ -864,8 +1225,11 @@ function renderTree(data) {
     .attr('d', d3.linkVertical().x(d => d.x).y(d => d.y));
 
   // Nodes
-  const TERMINAL_TYPES = new Set(['Identifier','IntLiteral','FloatLiteral','CharLiteral',
-                                   'StringLiteral','Type','Keyword','AssignOp','BinaryOp','UnaryOp']);
+  const TERMINAL_TYPES = new Set([
+    'Identifier','IntLiteral','FloatLiteral','CharLiteral',
+    'StringLiteral','Type','Keyword','AssignOp','BinaryOp','UnaryOp',
+    'PrefixOp','PostfixOp','CompoundOp'
+  ]);
 
   const node = g.selectAll('.node')
     .data(root.descendants())
@@ -958,7 +1322,7 @@ document.getElementById('validate-btn').addEventListener('click', async () => {
     showBanner('error', '✗ Network error — is the backend running?');
   } finally {
     btn.classList.remove('loading');
-    btn.innerHTML = '<span class="btn-icon">▶</span> Validate';
+    btn.innerHTML = '<span class="btn-icon">▶</span> Compile';
   }
 });
 
@@ -970,11 +1334,23 @@ function displayResults(data) {
   document.getElementById('status-icon').textContent = data.status === 'success' ? '✓' : '✗';
   document.getElementById('status-text').textContent = data.final_message;
 
-  // Tab badges
-  setTabBadge('tb-tokens',  (data.tokens || []).length, false);
+  // Stats
+  const statsEl = document.getElementById('status-stats');
+  const tokenCount = (data.tokens || []).length;
   const errCount = (data.lexical_errors||[]).length + (data.syntax_errors||[]).length + (data.semantic_errors||[]).length;
-  setTabBadge('tb-errors',  errCount, errCount > 0);
-  setTabBadge('tb-symbols', (data.symbol_table||[]).length, false);
+  const warnCount = (data.semantic_warnings||[]).length;
+  const symCount = (data.symbol_table||[]).length;
+
+  statsEl.innerHTML = `
+    <span class="stat-item">🔤 ${tokenCount} tokens</span>
+    <span class="stat-item">${errCount > 0 ? '❌' : '✅'} ${errCount} errors</span>
+    ${warnCount > 0 ? `<span class="stat-item">⚠️ ${warnCount} warnings</span>` : ''}
+    <span class="stat-item">📋 ${symCount} symbols</span>`;
+
+  // Tab badges
+  setTabBadge('tb-tokens',  tokenCount, false);
+  setTabBadge('tb-errors',  errCount + warnCount, errCount > 0 ? 'error' : warnCount > 0 ? 'warn' : false);
+  setTabBadge('tb-symbols', symCount, false);
 
   // Panels
   renderTokens(data.tokens || []);
@@ -993,10 +1369,16 @@ function displayResults(data) {
   }
 }
 
-function setTabBadge(id, count, isError) {
+function setTabBadge(id, count, mode) {
   const el = document.getElementById(id);
   el.textContent = count;
-  el.className = 'tab-badge' + (isError ? ' error' : count > 0 ? ' ok' : '');
+  if (mode === 'error') {
+    el.className = 'tab-badge error';
+  } else if (mode === 'warn') {
+    el.className = 'tab-badge warn';
+  } else {
+    el.className = 'tab-badge' + (count > 0 ? ' ok' : '');
+  }
 }
 
 function showBanner(type, msg) {
@@ -1005,6 +1387,7 @@ function showBanner(type, msg) {
   banner.className = type;
   document.getElementById('status-icon').textContent = type === 'success' ? '✓' : '✗';
   document.getElementById('status-text').textContent = msg;
+  document.getElementById('status-stats').innerHTML = '';
 }
 
 function escapeHtml(s) {
@@ -1019,8 +1402,10 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// ── Load default example ──────────────────────────────────────────────────────
-document.getElementById('code-input').value = EXAMPLES.while_loop;
+// ── Initialize ────────────────────────────────────────────────────────────────
+document.getElementById('code-input').value = EXAMPLES.for_loop;
+updateLineNumbers();
+updateCursorPos();
 </script>
 </body>
 </html>
